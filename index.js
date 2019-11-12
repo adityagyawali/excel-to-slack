@@ -1,91 +1,126 @@
-/* eslint-disable no-use-before-define */
-/* eslint-disable no-unused-vars */
-/* eslint-disable no-undef */
-function onEdit(e) {
-  const { oldValue } = e;
-  const newValue = e.value;
-  Logger.log(`this si oldvalue${oldValue}`);
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetName();
-  const actualSheetName = SpreadsheetApp.getActiveSpreadsheet()
-    .getActiveSheet()
-    .getName();
+/* eslint-disable*/
 
-  const { range } = e;
+// highlights the row that is just edited
+function onEdit(event) {
+  var { range } = event;
   const row = range.getRow();
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var range = sheet.getRange(`A${row}:H${row}`);
+  sheet.setActiveRange(range);
+}
 
-  const column = range.getColumn();
-  Logger.log(`current column is ${column}`);
-  const taskValue = SpreadsheetApp.getActiveSheet()
-    .getRange(row, 1)
-    .getValue();
-  if (column === 1 && oldValue === undefined && newValue !== '') {
-    const value = `New Task ${newValue} has been added!`;
-  } else if (column === 1 && oldValue !== '') {
-    const value = `Task name has been updated to ${newValue} from ${oldValue}.`;
-  } else if (column === 2) {
-    if (oldValue === undefined) {
-      const value = `In task ${taskValue}, ${newValue} task description has been added. `;
-    } else {
-      const value = `In task ${taskValue} task description has been changed from ${oldValue} to ${newValue}`;
-    }
-  } else if (column === 3) {
-    const value = ` ${newValue} is now responsible for the  ${taskValue}.`;
-  } else if (column === 4) {
-    if (oldValue === undefined || oldValue === 'dd/mm/yyyy') {
-      const value = `New deadline for ${taskValue} is set to ${newValue}.`;
-    } else {
-      const value = `New deadline for ${taskValue} has been changed from ${oldValue} to ${newValue}.`;
-    }
-  } else if (column === 5) {
-    if (newValue === 'Yes') {
-      const value = `${taskValue}, has now been completed`;
-    } else {
-      const value = `${taskValue} is not complete yet`;
-    }
-  } else if (column === 6) {
-    const value = `Comment for the  task ${taskValue} has been updated with ${newValue}.`;
-  }
+// get the url of the current spreadsheet
+function getSheetUrl() {
+  const SS = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = SS.getActiveSheet();
+  let url = '';
+  url += SS.getUrl();
+  url += '#gid=';
+  url += ss.getSheetId();
+  return url;
+}
 
-  const competedColumn = SpreadsheetApp.getActiveSheet()
-    .getRange(row, 1)
-    .getValue();
-  if (column === 8 && newValue === 'submit') {
-    sendToSlack(value, taskValue, oldValue, newValue, actualSheetName);
+
+//
+function spreadSheetToSlack() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getActiveSheet();
+  const currentSheet = sheet.getName();
+  var currentSheetUrl = getSheetUrl();
+  const values = sheet.getDataRange().getValues();
+
+  if (currentSheet === 'High Level Overview') {
+    for (var i = 0; i < values.length; i++) {
+      if (values[i][9] === 'Yes') {
+        var task = values[i][0];
+        var taskDescription = values[i][1];
+        var owner = values[i][2];
+        var responsible = values[i][3];
+        var awaiting_action = values[i][4];
+        var status = values[i][5];
+        var priority = values[i][6];
+        var deadline = values[i][7];
+        var path_to_material = values[i][8];
+        var currentSheetUrl = getSheetUrl();
+        sendToSlack(
+          task,
+          taskDescription,
+          owner,
+          responsible,
+          awaiting_action,
+          status,
+          deadline,
+          priority,
+          path_to_material,
+          currentSheet,
+          '',
+          '',
+          currentSheetUrl
+        );
+      }
+    }
   } else {
-    return false;
+    for (var i = 0; i < values.length; i++) {
+      if (values[i][7] === 'Yes') {
+        var task = values[i][0];
+        var taskDescription = values[i][1];
+        var responsible = values[i][2];
+        var deadline = values[i][3];
+        const completed = values[i][4];
+        const comments = values[i][5];
+        sendToSlack(
+          task,
+          taskDescription,
+          owner,
+          responsible,
+          awaiting_action,
+          status,
+          deadline,
+          priority,
+          path_to_material,
+          currentSheet,
+          completed,
+          comments,
+          currentSheetUrl
+        );
+      }
+    }
   }
 }
 
 // function to send message to Slack
-function sendToSlack(value, taskValue, oldValue, newValue, actualSheetName) {
-  if (actualSheetName === "Jesse's Business Trips") {
-    const spreadSheetUrl =
-      'https://docs.google.com/spreadsheets/d/1uL_kn3idnaFDpDMyblHu5sEamyxGrhEJ9PYyPmnCNcM/edit#gid=105282263';
-  } else {
-    const spreadSheetUrl =
-      'https://docs.google.com/spreadsheets/d/1uL_kn3idnaFDpDMyblHu5sEamyxGrhEJ9PYyPmnCNcM/edit#gid=1860252655';
-  }
-
+function sendToSlack(
+  task,
+  taskDescription,
+  owner,
+  responsible,
+  awaiting_action,
+  status,
+  deadline,
+  priority,
+  path_to_material,
+  currentSheet,
+  completed,
+  comments,
+  currentSheetUrl
+) {
   // custom slack webhook
   // change the XXXXX's to your own slack webhook. Get it from:
   // https://my.slack.com/services/new/incoming-webhook/
-  const url = 'https://hooks.slack.com/services/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';
-  const sonUrl =
-    'https://docs.google.com/spreadsheets/d/1uL_kn3idnaFDpDMyblHu5sEamyxGrhEJ9PYyPmnCNcM/edit#gid=1860252655';
-  const jesseUrl =
-    'https://docs.google.com/spreadsheets/d/1uL_kn3idnaFDpDMyblHu5sEamyxGrhEJ9PYyPmnCNcM/edit#gid=105282263';
-  if (oldValue === undefined || oldValue === 'dd/mm/yyyy') {
-    const payload = {
-      channel: '#general',
-      username: 'from spreadsteet',
-      text: ` ${value} in ${actualSheetName}. Please Take A look.\n ${spreadSheetUrl}.`,
+  const url = 'https://hooks.slack.com/services/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';
+  if (completed === 'Yes') {
+    var payload = {
+      channel: '#spreadsheet-message',
+      username: 'Operations Team',
+      icon_emoji: ':rocket:',
+      text: ` \`${task}\` in \`${currentSheet}\` is now complete. Take A look.\n ${currentSheetUrl}.`,
     };
   } else {
-    const payload = {
-      channel: '#general',
-      username: 'from spreadsteet',
-      text: ` ${value} in ${actualSheetName}. Value changed from ${oldValue} ==> ${newValue}. Please Take A look.\n ${spreadSheetUrl}.`,
+    var payload = {
+      channel: '#spreadsheet-message',
+      username: 'Operations Team',
+      icon_emoji: ':rocket:',
+      text: `There has been update to \`${task}\` in  \`${currentSheet}\`, which \`${responsible}\` is responsible for. The deadline is \`${deadline}\`. The task descriptions are: \n${taskDescription}. \n Take a look: \n ${currentSheetUrl}.`,
     };
   }
 
